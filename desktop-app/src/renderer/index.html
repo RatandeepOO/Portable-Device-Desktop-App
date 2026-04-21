@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.cloudinary.com; connect-src 'self' http://localhost:8000 ws://localhost:8000;">
+  <title>Emergency Response System</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-container">
+    <nav class="navbar">
+      <div class="nav-left">
+        <button id="btnStart" class="nav-btn btn-start">Start</button>
+        <button id="btnStop" class="nav-btn btn-stop">Stop</button>
+        <button id="btnSettings" class="nav-btn">Settings</button>
+      </div>
+      <div class="nav-title">Emergency Response System</div>
+      <div class="nav-right">
+        <div id="liveClock" class="clock">00:00:00</div>
+        <div id="connectionStatus" class="status-indicator offline">Offline</div>
+        <select id="portSelect" class="port-select">
+          <option value="">Select Port</option>
+        </select>
+      </div>
+    </nav>
+
+    <div class="main-content">
+      <div class="map-panel">
+        <div id="map"></div>
+      </div>
+      <div class="details-panel">
+        <h3>Dispatch Team Details</h3>
+        <div id="teamDetails" class="team-details-content">
+          <p class="placeholder-text">Select a team or alert to view details</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-panel">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="alerts">Alerts</button>
+        <button class="tab-btn" data-tab="devices">Devices</button>
+        <button class="tab-btn" data-tab="teams">Teams</button>
+        <button class="tab-btn" data-tab="logs">Server Logs</button>
+      </div>
+      <div class="data-panel">
+        <div id="alertsTab" class="tab-content active">
+          <div class="tab-header">
+            <h3>Active Alerts</h3>
+          </div>
+          <div id="alertsList" class="data-list"></div>
+        </div>
+        <div id="devicesTab" class="tab-content">
+          <div class="tab-header">
+            <h3>Registered Devices</h3>
+            <button id="btnRegisterDevice" class="action-btn">+ Register Device</button>
+          </div>
+          <div id="devicesList" class="data-list"></div>
+        </div>
+        <div id="teamsTab" class="tab-content">
+          <div class="tab-header">
+            <h3>Dispatch Teams</h3>
+            <button id="btnAddTeam" class="action-btn">+ Add Team</button>
+          </div>
+          <div id="teamsList" class="data-list"></div>
+        </div>
+        <div id="logsTab" class="tab-content" style="background:#1a1a1a; color:#0f0; font-family:monospace; padding:10px; overflow-y:auto;">
+          <div id="serverLogsContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="deviceModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Register New Device</h2>
+      <form id="deviceForm">
+        <div class="form-group">
+          <label>Device ID</label>
+          <input type="text" id="deviceId" required>
+        </div>
+        <div class="form-group">
+          <label>User Name</label>
+          <input type="text" id="userName" required>
+        </div>
+        <div class="form-group">
+          <label>Emergency Contact Name</label>
+          <input type="text" id="emergencyContactName">
+        </div>
+        <div class="form-group">
+          <label>Emergency Contact Phone</label>
+          <input type="text" id="emergencyContactPhone">
+        </div>
+        <div class="form-group">
+          <label>User Image</label>
+          <input type="file" id="imageFile" accept="image/*">
+        </div>
+        <button type="submit" class="submit-btn" id="deviceSubmitBtn">Register Device</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="teamModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Add New Team Member</h2>
+      <form id="teamForm">
+        <div class="form-group">
+          <label>Team ID</label>
+          <input type="text" id="teamId" required>
+        </div>
+        <div class="form-group">
+          <label>Team Leader Name</label>
+          <input type="text" id="teamLeaderName" required>
+        </div>
+        <div class="form-group">
+          <label>No of Members</label>
+          <input type="number" id="teamMembersCount">
+        </div>
+        <div class="form-group">
+          <label>Team Passkey</label>
+          <input type="password" id="teamPasskey" required>
+        </div>
+        <button type="submit" class="submit-btn" id="teamSubmitBtn">Add Team Member</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Settings</h2>
+      <form id="settingsForm">
+        <div class="form-group">
+          <label>Theme</label>
+          <select id="settingTheme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Font Family</label>
+          <select id="settingFont">
+            <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI (Default)</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Roboto, sans-serif">Roboto</option>
+            <option value="'Courier New', Courier, monospace">Courier New</option>
+          </select>
+        </div>
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="settingHighlightBorders">
+          <label for="settingHighlightBorders">Highlight inner and outer borders of Uttarakhand</label>
+        </div>
+        <button type="button" id="btnSaveSettings" class="submit-btn" style="margin-top:20px;">Save Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="uttarakhand_districts.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

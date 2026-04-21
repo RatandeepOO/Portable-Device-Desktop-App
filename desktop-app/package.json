@@ -1,0 +1,46 @@
+{
+  "name": "emergency-response-desktop",
+  "version": "1.0.0",
+  "description": "Emergency Response System Desktop Application",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder",
+    "build:exe": "electron-builder --win"
+  },
+  "keywords": [
+    "emergency",
+    "electron",
+    "iot"
+  ],
+  "author": "",
+  "license": "ISC",
+  "build": {
+    "appId": "com.emergency.response",
+    "productName": "Emergency Response",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ]
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "electron": "^41.2.1",
+    "serialport": "^13.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.8.1"
+  }
+}
