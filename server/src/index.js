@@ -63,8 +63,8 @@ const DISPATCH_TIMEOUT = parseInt(process.env.DISPATCH_TIMEOUT) || 60;
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const result = await auth.login(email, password);
+    const { teamId, password } = req.body;
+    const result = await auth.login(teamId, password);
     res.json(result);
   } catch (error) {
     res.status(401).json({ error: error.message });
@@ -73,8 +73,8 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, name, phone } = req.body;
-    const result = await auth.register(email, password, name, phone);
+    const { teamId, password, name, phone } = req.body;
+    const result = await auth.register(teamId, password, name, phone);
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -163,13 +163,13 @@ app.get('/api/teams', async (req, res) => {
 
 app.post('/api/teams', async (req, res) => {
   try {
-    const { email, password, name, phone } = req.body;
-    const result = await auth.register(email, password, name, phone, 'team_member');
+    const { teamId, password, name, phone } = req.body;
+    const result = await auth.register(teamId, password, name, phone, 'team_member');
     
     broadcastToAll({ type: 'team:updated', action: 'create', data: result.user });
     res.json(result);
   } catch (error) {
-    if (error.message === 'Email already registered') {
+    if (error.message === 'Team ID already registered') {
       return res.status(409).json({ error: error.message });
     }
     res.status(500).json({ error: error.message });

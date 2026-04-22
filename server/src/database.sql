@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Users table (Team members and admins)
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email TEXT UNIQUE NOT NULL,
+  team_id TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
   phone TEXT,
@@ -79,7 +79,7 @@ CREATE POLICY "Anyone can read alerts" ON alerts FOR SELECT USING (true);
 CREATE POLICY "Service role can manage alerts" ON alerts FOR ALL USING (auth.role() = 'service_role');
 
 -- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_team_id ON users(team_id);
 CREATE INDEX IF NOT EXISTS idx_users_is_available ON users(is_available);
 CREATE INDEX IF NOT EXISTS idx_devices_device_id ON devices(device_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_device_id ON alerts(device_id);

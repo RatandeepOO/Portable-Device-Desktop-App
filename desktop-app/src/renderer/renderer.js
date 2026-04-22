@@ -299,7 +299,7 @@ function renderTeamsList() {
         <div class="status-dot ${getTeamStatusClass(team)}"></div>
         <div class="data-item-info">
           <div class="data-item-title">${team.name}</div>
-          <div class="data-item-subtitle">ID: ${team.email} - Members: ${team.phone || '0'}</div>
+          <div class="data-item-subtitle">ID: ${team.team_id} - Members: ${team.phone || '0'}</div>
         </div>
       </div>
       <div class="data-item-actions">
@@ -348,7 +348,7 @@ function showTeamDetails(team) {
     </div>
     <div class="detail-item">
       <span class="detail-label">Team ID</span>
-      <span class="detail-value">${team.email}</span>
+      <span class="detail-value">${team.team_id}</span>
     </div>
     <div class="detail-item">
       <span class="detail-label">No of Members</span>
@@ -495,7 +495,7 @@ function setupEventListeners() {
   document.getElementById('teamForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = {
-      email: document.getElementById('teamId').value,
+      teamId: document.getElementById('teamId').value,
       password: document.getElementById('teamPasskey').value,
       name: document.getElementById('teamLeaderName').value,
       phone: document.getElementById('teamMembersCount').value.toString()
@@ -503,7 +503,7 @@ function setupEventListeners() {
     
     try {
       if (document.getElementById('teamSubmitBtn').textContent === 'Update Team Member') {
-        const selectedId = teams.find(t => t.email === data.email)?.id;
+        const selectedId = teams.find(t => t.team_id === data.teamId)?.id;
         if (selectedId) await window.electronAPI.apiRequest({ method: 'PUT', url: `/api/teams/${selectedId}`, data });
       } else {
         await window.electronAPI.apiRequest({ method: 'POST', url: '/api/teams', data });
@@ -661,7 +661,7 @@ window.editTeam = async function(id) {
   const team = teams.find(t => t.id === id);
   if (!team) return;
   
-  document.getElementById('teamId').value = team.email;
+  document.getElementById('teamId').value = team.team_id;
   document.getElementById('teamPasskey').value = '';
   document.getElementById('teamLeaderName').value = team.name;
   document.getElementById('teamMembersCount').value = team.phone || '';
