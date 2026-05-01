@@ -7,18 +7,24 @@
     "start": "node src/index.js",
     "dev": "node src/index.js"
   },
-  "keywords": ["emergency", "websocket", "iot"],
+  "keywords": [
+    "emergency",
+    "websocket",
+    "iot"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "ws": "^8.18.0",
-    "ioredis": "^5.4.1",
-    "jsonwebtoken": "^9.0.2",
     "@supabase/supabase-js": "^2.47.10",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.10.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "bcryptjs": "^2.4.3",
-    "uuid": "^11.0.3"
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "uuid": "^11.0.3",
+    "ws": "^8.18.0"
   }
 }

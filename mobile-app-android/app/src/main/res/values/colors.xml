@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base Colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- App Theme Colors -->
+    <color name="bg_dark">#FF0A0A0A</color>
+    <color name="surface_dark">#FF121212</color>
+    <color name="surface_light">#FF1E1E1E</color>
+
+    <!-- Accent Colors -->
+    <color name="blue_accent">#FF2962FF</color>
+    <color name="blue_accent_light">#FF448AFF</color>
+    <color name="amber_400">#FFFFCA28</color>
+    <color name="amber_dark">#FFE65100</color>
+
+    <!-- Status Colors -->
+    <color name="green_400">#FF66BB6A</color>
+    <color name="green_600">#FF43A047</color>
+    <color name="green_dark">#FF1B5E20</color>
+    <color name="red_400">#FFEF5350</color>
+    <color name="red_dark">#FFB71C1C</color>
+
+    <!-- Neutral Colors -->
+    <color name="grey_400">#FFBDBDBD</color>
+    <color name="grey_500">#FF9E9E9E</color>
+    <color name="grey_600">#FF757575</color>
+    <color name="grey_700">#FF616161</color>
+    <color name="grey_800">#FF424242</color>
+    <color name="grey_900">#FF212121</color>
+</resources>

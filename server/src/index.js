@@ -8,6 +8,19 @@ const { v4: uuidv4 } = require('uuid');
 const Redis = require('ioredis');
 const supabase = require('./supabase');
 const auth = require('./auth');
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Configure Multer
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 const app = express();
 app.use(cors());
@@ -179,8 +192,18 @@ app.post('/api/teams', async (req, res) => {
 app.put('/api/teams/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, is_available } = req.body;
-    const { data, error } = await supabase.from('users').update({ name, phone, is_available }).eq('id', id).select().single();
+    const { teamId, name, phone, password, is_available, image_url } = req.body;
+    let updates = { name, phone };
+    
+    if (teamId) updates.team_id = teamId;
+    if (image_url) updates.image_url = image_url;
+    if (is_available !== undefined) updates.is_available = is_available;
+    if (password) {
+      const bcrypt = require('bcryptjs');
+      updates.password_hash = await bcrypt.hash(password, 10);
+    }
+
+    const { data, error } = await supabase.from('users').update(updates).eq('id', id).select().single();
     if (error) throw error;
     
     broadcastToAll({ type: 'team:updated', action: 'update', data });
@@ -200,6 +223,28 @@ app.delete('/api/teams/:id', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/upload', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image provided' });
+    }
+
+    // Convert buffer to base64 for Cloudinary
+    const b64 = Buffer.from(req.file.buffer).toString('base64');
+    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+    
+    const result = await cloudinary.uploader.upload(dataURI, {
+      resource_type: 'auto',
+      folder: 'emergency_system'
+    });
+
+    res.json({ url: result.secure_url });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Upload failed: ' + error.message });
   }
 });
 
@@ -362,8 +407,31 @@ wss.on('connection', (ws) => {
       const data = JSON.parse(message);
 
       if (data.type === 'team:login') {
-        const decoded = jwt.verify(data.token, process.env.JWT_SECRET);
-        teamId = decoded.userId;
+        if (data.token) {
+          try {
+            const decoded = jwt.verify(data.token, process.env.JWT_SECRET);
+            teamId = decoded.userId;
+          } catch (e) {
+            console.error('Invalid token', e);
+            return;
+          }
+        } else if (data.teamId && data.passkey) {
+          try {
+            const result = await auth.login(data.teamId, data.passkey);
+            teamId = result.user.id;
+          } catch (e) {
+            console.error('Auth failed:', e.message);
+            ws.send(JSON.stringify({ type: 'error', message: 'Authentication failed' }));
+            return;
+          }
+        } else if (data.teamId) {
+          // Fallback for backward compatibility or simple testing
+          teamId = data.teamId;
+        } else {
+          console.error('No authentication data provided');
+          return;
+        }
+        
         clients.set(teamId, ws);
 
         await redis.set(`team:${teamId}:status`, JSON.stringify({
@@ -453,6 +521,18 @@ wss.on('connection', (ws) => {
         });
       }
 
+      if (data.type === 'serial:data') {
+        // Expected format: UID: Div01 | Status: 1 | Lat: 29.219404 | Lon: 78.952751
+        const match = data.data.match(/UID:\s*([^|]+)\s*\|\s*Status:\s*(\d+)\s*\|\s*Lat:\s*([0-9.-]+)\s*\|\s*Lon:\s*([0-9.-]+)/i);
+        if (match) {
+          const deviceId = match[1].trim();
+          const clickCount = parseInt(match[2], 10);
+          const lat = parseFloat(match[3]);
+          const lng = parseFloat(match[4]);
+          await handleNewAlert(deviceId, lat, lng, clickCount);
+        }
+      }
+
     } catch (error) {
       console.error('WebSocket message error:', error);
     }
@@ -487,7 +567,7 @@ server.on('error', (err) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
 

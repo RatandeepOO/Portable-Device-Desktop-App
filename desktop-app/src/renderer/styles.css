@@ -353,6 +353,33 @@ body {
   color: var(--text-secondary);
 }
 
+.team-avatar-mini {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.team-avatar-mini-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+}
+
+.team-avatar-mini-placeholder::before {
+  content: '\f007';
+  font-family: 'Font Awesome 5 Free';
+  font-weight: 900;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
 .data-item-actions {
   display: flex;
   gap: 8px;

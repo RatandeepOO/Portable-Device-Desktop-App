@@ -121,13 +121,14 @@ function applySettings() {
 }
 
 function parseSerialData(data) {
-  const parts = data.split(',').map(p => p.trim());
-  if (parts.length >= 4) {
+  // Expected format: UID: Div01 | Status: 1 | Lat: 29.219404 | Lon: 78.952751
+  const match = data.match(/UID:\s*([^|]+)\s*\|\s*Status:\s*(\d+)\s*\|\s*Lat:\s*([0-9.-]+)\s*\|\s*Lon:\s*([0-9.-]+)/i);
+  if (match) {
     return {
-      device_id: parts[0],
-      lat: parseFloat(parts[1]),
-      lng: parseFloat(parts[2]),
-      click_count: parseInt(parts[3])
+      device_id: match[1].trim(),
+      click_count: parseInt(match[2], 10),
+      lat: parseFloat(match[3]),
+      lng: parseFloat(match[4])
     };
   }
   return null;
@@ -288,18 +289,22 @@ function renderDevicesList() {
 function renderTeamsList() {
   const container = document.getElementById('teamsList');
   
-  if (teams.length === 0) {
+  // Filter for teams that have a name and team_id (meaning they are registered)
+  const registeredTeams = teams.filter(t => t.name && t.team_id && t.name !== 'Mobile User');
+  
+  if (registeredTeams.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>No team members</p></div>';
     return;
   }
 
-  container.innerHTML = teams.map(team => `
+  container.innerHTML = registeredTeams.map(team => `
     <div class="data-item ${selectedItem?.id === team.id ? 'selected' : ''}" data-id="${team.id}" data-type="team">
       <div class="data-item-header">
         <div class="status-dot ${getTeamStatusClass(team)}"></div>
+        ${team.image_url ? `<img src="${team.image_url}" class="team-avatar-mini" />` : '<div class="team-avatar-mini-placeholder"></div>'}
         <div class="data-item-info">
           <div class="data-item-title">${team.name}</div>
-          <div class="data-item-subtitle">ID: ${team.team_id} - Members: ${team.phone || '0'}</div>
+          <div class="data-item-subtitle">ID: ${team.team_id}</div>
         </div>
       </div>
       <div class="data-item-actions">
@@ -421,6 +426,7 @@ function setupEventListeners() {
 
   document.getElementById('btnAddTeam').addEventListener('click', () => {
     document.getElementById('teamForm').reset();
+    document.getElementById('teamForm').dataset.editId = '';
     document.getElementById('teamSubmitBtn').textContent = 'Add Team Member';
     document.getElementById('teamModal').classList.add('show');
   });
@@ -503,13 +509,14 @@ function setupEventListeners() {
     
     try {
       if (document.getElementById('teamSubmitBtn').textContent === 'Update Team Member') {
-        const selectedId = teams.find(t => t.team_id === data.teamId)?.id;
+        const selectedId = document.getElementById('teamForm').dataset.editId;
         if (selectedId) await window.electronAPI.apiRequest({ method: 'PUT', url: `/api/teams/${selectedId}`, data });
       } else {
         await window.electronAPI.apiRequest({ method: 'POST', url: '/api/teams', data });
       }
       document.getElementById('teamModal').classList.remove('show');
       document.getElementById('teamForm').reset();
+      document.getElementById('teamForm').dataset.editId = '';
       loadData();
     } catch (error) {
       alert('Error adding team member: ' + error.message);
@@ -661,6 +668,7 @@ window.editTeam = async function(id) {
   const team = teams.find(t => t.id === id);
   if (!team) return;
   
+  document.getElementById('teamForm').dataset.editId = team.id;
   document.getElementById('teamId').value = team.team_id;
   document.getElementById('teamPasskey').value = '';
   document.getElementById('teamLeaderName').value = team.name;

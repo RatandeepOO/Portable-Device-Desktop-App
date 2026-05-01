@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { execSync, spawn } = require('child_process');
+const fs = require('fs');
 
 let mainWindow;
 let serialPort = null;
@@ -11,7 +12,26 @@ let ws = null;
 let isStreaming = false;
 let availablePorts = [];
 
-const WS_URL = 'ws://127.0.0.1:8000';
+// Load .env manually since dotenv is not a dependency
+function loadEnv() {
+  const envPath = path.join(__dirname, '../../../.env');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf8');
+    content.split('\n').forEach(line => {
+      const [key, value] = line.split('=');
+      if (key && value) {
+        process.env[key.trim()] = value.trim();
+      }
+    });
+  }
+}
+
+loadEnv();
+
+const WS_PORT = process.env.WS_PORT || 8000;
+// Use ngrok URL if available, otherwise fallback to local
+const PUBLIC_URL = process.env.PUBLIC_SERVER_URL || `http://127.0.0.1:${WS_PORT}`;
+const WS_URL = PUBLIC_URL.replace('http', 'ws');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -236,7 +256,7 @@ ipcMain.handle('api:request', async (event, { method, url, data }) => {
   try {
     const response = await axios({
       method,
-      url: `http://127.0.0.1:8000${url}`,
+      url: `${PUBLIC_URL}${url}`,
       data
     });
     return response.data;
