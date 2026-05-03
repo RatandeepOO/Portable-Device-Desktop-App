@@ -11,6 +11,13 @@ let serialPort = null;
 let ws = null;
 let isStreaming = false;
 let availablePorts = [];
+let serverProcess = null;
+let ngrokProcess = null;
+
+// Configuration
+const WS_PORT = process.env.WS_PORT || 8000;
+const INTERNAL_URL = `http://127.0.0.1:${WS_PORT}`;
+const NGROK_DOMAIN = "uncondoling-tenderly-wilfred.ngrok-free.dev";
 
 // Load .env manually since dotenv is not a dependency
 function loadEnv() {
@@ -18,7 +25,9 @@ function loadEnv() {
   if (fs.existsSync(envPath)) {
     const content = fs.readFileSync(envPath, 'utf8');
     content.split('\n').forEach(line => {
-      const [key, value] = line.split('=');
+      const parts = line.split('=');
+      const key = parts[0];
+      const value = parts.slice(1).join('=');
       if (key && value) {
         process.env[key.trim()] = value.trim();
       }
@@ -26,12 +35,36 @@ function loadEnv() {
   }
 }
 
+function updateEnv(key, value) {
+  const envPath = path.join(__dirname, '../../../.env');
+  if (!fs.existsSync(envPath)) {
+    fs.writeFileSync(envPath, `${key}=${value}\n`);
+    return;
+  }
+
+  const content = fs.readFileSync(envPath, 'utf8');
+  const lines = content.split('\n');
+  let updated = false;
+  const newLines = lines.map(line => {
+    if (line.trim().startsWith(`${key}=`)) {
+      updated = true;
+      return `${key}=${value}`;
+    }
+    return line;
+  });
+
+  if (!updated) {
+    newLines.push(`${key}=${value}`);
+  }
+
+  fs.writeFileSync(envPath, newLines.join('\n').trim() + '\n');
+}
+
 loadEnv();
 
-const WS_PORT = process.env.WS_PORT || 8000;
 // Use ngrok URL if available, otherwise fallback to local
-const PUBLIC_URL = process.env.PUBLIC_SERVER_URL || `http://127.0.0.1:${WS_PORT}`;
-const WS_URL = PUBLIC_URL.replace('http', 'ws');
+let PUBLIC_URL = process.env.PUBLIC_SERVER_URL || INTERNAL_URL;
+let WS_URL = INTERNAL_URL.replace('http', 'ws'); // Desktop app always connects locally for stability
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -107,6 +140,64 @@ function ensurePortFree(port) {
   } catch (e) {
     // If command fails, port is likely already free
   }
+}
+
+function stopNgrok() {
+  if (ngrokProcess) {
+    console.log('Stopping Ngrok...');
+    if (process.platform === 'win32') {
+      spawn("taskkill", ["/pid", ngrokProcess.pid, '/f', '/t']);
+    } else {
+      ngrokProcess.kill();
+    }
+    ngrokProcess = null;
+  }
+}
+
+function startNgrok() {
+  if (ngrokProcess) return;
+
+  // Kill any existing ngrok processes first to avoid "already online" error
+  try {
+    console.log('Cleaning up existing ngrok processes...');
+    if (process.platform === 'win32') {
+      execSync('taskkill /F /IM ngrok.exe /T', { stdio: 'ignore' });
+    } else {
+      execSync('pkill -9 ngrok', { stdio: 'ignore' });
+    }
+  } catch (e) {
+    // Ignore error if no process found
+  }
+
+  console.log('Starting Ngrok...');
+  const args = ['http', WS_PORT.toString(), '--domain', NGROK_DOMAIN];
+  
+  ngrokProcess = spawn('ngrok', args, { shell: true });
+
+  ngrokProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    console.log(`[Ngrok] ${output}`);
+    
+    // Once ngrok is started, we can assume the URL is active because it's a reserved domain
+    const url = `https://${NGROK_DOMAIN}`;
+    if (PUBLIC_URL !== url) {
+      console.log(`System Public URL: ${url}`);
+      PUBLIC_URL = url;
+      updateEnv('PUBLIC_SERVER_URL', url);
+      mainWindow?.webContents.send('server:log', `Ngrok started: ${url}\n`);
+    }
+  });
+
+  ngrokProcess.stderr.on('data', (data) => {
+    const errorMsg = data.toString();
+    console.error(`[Ngrok Error] ${errorMsg}`);
+    mainWindow?.webContents.send('server:log', `Ngrok Error: ${errorMsg}`);
+  });
+
+  ngrokProcess.on('close', (code) => {
+    console.log(`Ngrok process exited with code ${code}`);
+    ngrokProcess = null;
+  });
 }
 
 function stopServer() {
@@ -229,8 +320,6 @@ ipcMain.handle('serial:disconnect', async () => {
   return { success: true };
 });
 
-let serverProcess = null;
-
 ipcMain.handle('serial:start', async () => {
   isStreaming = true;
   startServer();
@@ -256,7 +345,7 @@ ipcMain.handle('api:request', async (event, { method, url, data }) => {
   try {
     const response = await axios({
       method,
-      url: `${PUBLIC_URL}${url}`,
+      url: `${INTERNAL_URL}${url}`,
       data
     });
     return response.data;
@@ -275,6 +364,7 @@ ipcMain.handle('api:request', async (event, { method, url, data }) => {
 app.whenReady().then(() => {
   createWindow();
   startServer();
+  startNgrok();
   connectWebSocket();
   scanSerialPorts();
 
@@ -290,6 +380,7 @@ app.on('window-all-closed', () => {
     disconnectSerial();
     if (ws) ws.close();
     stopServer();
+    stopNgrok();
     app.quit();
   }
 });

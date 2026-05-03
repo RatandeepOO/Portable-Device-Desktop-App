@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const Redis = require('ioredis');
+// const Redis = require('ioredis');
 const supabase = require('./supabase');
 const auth = require('./auth');
 const cloudinary = require('cloudinary').v2;
@@ -26,6 +26,11 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+console.log('Environment Check:');
+console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? 'Loaded' : 'MISSING');
+console.log('- SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'Loaded' : 'MISSING');
+console.log('- WS_PORT:', process.env.WS_PORT || 8000);
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -94,12 +99,22 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+app.get('/api/test', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
 app.get('/api/devices', async (req, res) => {
   try {
+    console.log('Fetching devices from Supabase...');
     const { data, error } = await supabase.from('devices').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error (devices):', error);
+      throw error;
+    }
+    console.log(`Successfully fetched ${data?.length || 0} devices.`);
     res.json(data);
   } catch (error) {
+    console.error('API error (devices):', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -166,10 +181,16 @@ app.delete('/api/devices/:id', async (req, res) => {
 
 app.get('/api/teams', async (req, res) => {
   try {
+    console.log('Fetching teams from Supabase...');
     const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error (teams):', error);
+      throw error;
+    }
+    console.log(`Successfully fetched ${data?.length || 0} teams.`);
     res.json(data);
   } catch (error) {
+    console.error('API error (teams):', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -250,13 +271,19 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 
 app.get('/api/alerts', async (req, res) => {
   try {
+    console.log('Fetching alerts from Supabase...');
     const { data: alerts, error: alertError } = await supabase
       .from('alerts')
       .select('*, devices(*), users(*)')
       .order('created_at', { ascending: false });
-    if (alertError) throw alertError;
+    if (alertError) {
+      console.error('Supabase error (alerts):', alertError);
+      throw alertError;
+    }
+    console.log(`Successfully fetched ${alerts?.length || 0} alerts.`);
     res.json(alerts);
   } catch (error) {
+    console.error('API error (alerts):', error.message);
     res.status(500).json({ error: error.message });
   }
 });

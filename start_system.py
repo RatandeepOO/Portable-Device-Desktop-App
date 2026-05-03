@@ -61,6 +61,17 @@ def start_backend():
 
 def start_ngrok():
     print(f"Starting Ngrok with domain: {NGROK_DOMAIN}...")
+    
+    # Kill any existing ngrok processes first to avoid "already online" error
+    try:
+        print("Cleaning up existing ngrok processes...")
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/F', '/IM', 'ngrok.exe', '/T'], capture_output=True)
+        else:
+            subprocess.run(['pkill', '-9', 'ngrok'], capture_output=True)
+    except:
+        pass
+
     # Attempt to start ngrok
     # We use the domain provided in the user's previous attempt
     ngrok_cmd = ["ngrok", "http", "8000", "--domain", NGROK_DOMAIN]
