@@ -1,4 +1,6 @@
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+if (!process.env.SUPABASE_URL) {
+  require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+}
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');

@@ -16,6 +16,25 @@
   ],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "serialport": "^13.0.0",
+    "uuid": "^11.0.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^41.2.1",
+    "electron-builder": "^26.8.1"
+  },
   "build": {
     "appId": "com.emergency.response",
     "productName": "Emergency Response",
@@ -29,18 +48,26 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
+    "npmRebuild": false,
+    "extraResources": [
+      {
+        "from": "../server",
+        "to": "server",
+        "filter": [
+          "src/**/*",
+          "package.json"
+        ]
+      },
+      {
+        "from": "../.env",
+        "to": ".env"
+      }
+    ],
     "files": [
       "src/**/*",
       "assets/**/*"
-    ]
-  },
-  "dependencies": {
-    "axios": "^1.7.9",
-    "electron": "^41.2.1",
-    "serialport": "^13.0.0",
-    "ws": "^8.18.0"
-  },
-  "devDependencies": {
-    "electron-builder": "^26.8.1"
+    ],
+    "asar": true,
+    "electronDist": "node_modules/electron/dist"
   }
 }

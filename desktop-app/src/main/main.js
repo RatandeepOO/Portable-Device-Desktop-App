@@ -3,7 +3,7 @@ const path = require('path');
 const WebSocket = require('ws');
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
-const { execSync, spawn } = require('child_process');
+const { execSync, spawn, fork } = require('child_process');
 const fs = require('fs');
 
 let mainWindow;
@@ -20,8 +20,13 @@ const INTERNAL_URL = `http://127.0.0.1:${WS_PORT}`;
 const NGROK_DOMAIN = "fractious-subimbricately-ivey.ngrok-free.dev";
 
 // Load .env manually since dotenv is not a dependency
+// Load .env manually
 function loadEnv() {
-  const envPath = path.join(__dirname, '../../../.env');
+  const isPackaged = app.isPackaged;
+  const envPath = isPackaged 
+    ? path.join(process.resourcesPath, '.env')
+    : path.join(__dirname, '../../../.env');
+    
   if (fs.existsSync(envPath)) {
     const content = fs.readFileSync(envPath, 'utf8');
     content.split('\n').forEach(line => {
@@ -36,7 +41,11 @@ function loadEnv() {
 }
 
 function updateEnv(key, value) {
-  const envPath = path.join(__dirname, '../../../.env');
+  const isPackaged = app.isPackaged;
+  const envPath = isPackaged 
+    ? path.join(process.resourcesPath, '.env')
+    : path.join(__dirname, '../../../.env');
+
   if (!fs.existsSync(envPath)) {
     fs.writeFileSync(envPath, `${key}=${value}\n`);
     return;
@@ -217,10 +226,15 @@ function startServer() {
 
   ensurePortFree(8000);
   console.log('Starting backend server...');
-  const serverPath = path.join(__dirname, '../../../server');
-  serverProcess = spawn(/^win/.test(process.platform) ? 'npm.cmd' : 'npm', ['start'], { 
-    cwd: serverPath,
-    shell: true 
+  
+  const isPackaged = app.isPackaged;
+  const serverPath = isPackaged 
+    ? path.join(process.resourcesPath, 'server/src/index.js')
+    : path.join(__dirname, '../../../server/src/index.js');
+
+  serverProcess = fork(serverPath, [], {
+    env: { ...process.env },
+    stdio: ['inherit', 'pipe', 'pipe', 'ipc']
   });
 
   serverProcess.stdout.on('data', (data) => {
