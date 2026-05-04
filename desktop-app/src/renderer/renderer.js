@@ -79,10 +79,10 @@ function updateMapBorder(show) {
             const targetLayer = e.target;
             const isDark = localStorage.getItem('theme') === 'dark';
             targetLayer.setStyle({
-              weight: 3,
-              color: isDark ? '#FFFFFF' : '#FF0000',
-              fillColor: isDark ? '#FFFFFF' : '#FF0000',
-              fillOpacity: 0.2
+              weight: 2,
+              color: isDark ? '#AEE0FF' : '#00D4FF',
+              fillColor: isDark ? '#AEE0FF' : '#00D4FF',
+              fillOpacity: 0.3
             });
             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
               targetLayer.bringToFront();
@@ -118,6 +118,16 @@ function applySettings() {
 
   const showBorders = localStorage.getItem('highlightBorders') === 'true';
   if (map) updateMapBorder(showBorders);
+
+  const debugMode = localStorage.getItem('debugMode') === 'true';
+  const btnTriggerAlert = document.getElementById('btnTriggerAlert');
+  if (btnTriggerAlert) {
+    if (debugMode) {
+      btnTriggerAlert.classList.remove('hidden');
+    } else {
+      btnTriggerAlert.classList.add('hidden');
+    }
+  }
 }
 
 function parseSerialData(data) {
@@ -145,6 +155,7 @@ function getStatusClass(status) {
 }
 
 function getTeamStatusClass(team) {
+  if (!team.is_online) return 'offline';
   if (!team.is_available) return 'busy';
   return 'available';
 }
@@ -188,10 +199,20 @@ function createAlertMarker(alert) {
 function createOrUpdateTeamMarker(team) {
   if (!team.current_lat || !team.current_lng) return null;
 
+  // Only show markers for online teams, or if they are NOT a Mobile User
+  // (Assuming Mobile Users should only be visible when active/connected)
+  if (!team.is_online && team.name === 'Mobile User') {
+    if (teamMarkers[team.id]) {
+      teamMarkers[team.id].remove();
+      delete teamMarkers[team.id];
+    }
+    return null;
+  }
+
   const statusClass = getTeamStatusClass(team);
   const icon = L.divIcon({
-    className: 'team-marker',
-    html: `<div class="status-dot ${statusClass}" style="width:24px;height:24px;border-radius:50%;border:2px solid white;"></div>`,
+    className: `team-marker ${statusClass}`,
+    html: `<div class="status-dot ${statusClass}"></div>`,
     iconSize: [24, 24],
     iconAnchor: [12, 12]
   });
@@ -382,7 +403,9 @@ function showTeamDetails(team) {
     </div>
     <div class="detail-item">
       <span class="detail-label">Status</span>
-      <span class="detail-value ${team.is_available ? 'status-online' : 'status-busy'}">${team.is_available ? 'Available' : 'Busy'}</span>
+      <span class="detail-value ${team.is_online ? (team.is_available ? 'status-online' : 'status-busy') : 'status-offline'}">
+        ${team.is_online ? (team.is_available ? 'Available' : 'Busy') : 'Offline'}
+      </span>
     </div>
     <div class="detail-item">
       <span class="detail-label">Last Location Update</span>
@@ -513,6 +536,7 @@ function setupEventListeners() {
     document.getElementById('settingTheme').value = localStorage.getItem('theme') || 'light';
     document.getElementById('settingFont').value = localStorage.getItem('font') || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
     document.getElementById('settingHighlightBorders').checked = localStorage.getItem('highlightBorders') === 'true';
+    document.getElementById('settingDebugMode').checked = localStorage.getItem('debugMode') === 'true';
     document.getElementById('settingsModal').classList.add('show');
   });
 
@@ -532,13 +556,55 @@ function setupEventListeners() {
     const theme = document.getElementById('settingTheme').value;
     const font = document.getElementById('settingFont').value;
     const highlightBorders = document.getElementById('settingHighlightBorders').checked;
+    const debugMode = document.getElementById('settingDebugMode').checked;
 
     localStorage.setItem('theme', theme);
     localStorage.setItem('font', font);
     localStorage.setItem('highlightBorders', highlightBorders);
+    localStorage.setItem('debugMode', debugMode);
 
     applySettings();
     document.getElementById('settingsModal').classList.remove('show');
+  });
+
+  document.getElementById('settingDebugMode').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      // Don't flip the switch yet, wait for passkey
+      e.target.checked = false; 
+      document.getElementById('passkeyModal').classList.add('show');
+    } else {
+      const btnTriggerAlert = document.getElementById('btnTriggerAlert');
+      if (btnTriggerAlert) btnTriggerAlert.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('debugPasskey').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('btnVerifyPasskey').click();
+    }
+  });
+
+  document.getElementById('btnVerifyPasskey').addEventListener('click', () => {
+    const input = document.getElementById('debugPasskey');
+    const passkey = input.value;
+    const toggle = document.getElementById('settingDebugMode');
+    const btnTriggerAlert = document.getElementById('btnTriggerAlert');
+
+    if (passkey === 'Update_safe') {
+      toggle.checked = true;
+      if (btnTriggerAlert) btnTriggerAlert.classList.remove('hidden');
+      document.getElementById('passkeyModal').classList.remove('show');
+      input.value = '';
+    } else {
+      alert('Invalid passkey!');
+      input.value = '';
+    }
+  });
+
+  document.getElementById('btnCancelPasskey').addEventListener('click', () => {
+    document.getElementById('debugPasskey').value = '';
+    document.getElementById('passkeyModal').classList.remove('show');
+    document.getElementById('settingDebugMode').checked = false;
   });
 
   document.querySelectorAll('.close').forEach(close => {
@@ -750,7 +816,7 @@ function setupEventListeners() {
     }
     
     const reloadTypes = [
-      'device:updated', 'team:updated', 'team:offline', 'team:status'
+      'device:updated', 'team:updated', 'team:offline', 'team:online', 'team:status'
     ];
     
     if (reloadTypes.includes(data.type)) {

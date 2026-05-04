@@ -49,7 +49,7 @@
         <div id="alertsTab" class="tab-content active">
           <div class="tab-header">
             <h3>Active Alerts</h3>
-            <button id="btnTriggerAlert" class="action-btn" style="background:#ff9800;">+ Trigger Test Alert</button>
+            <button id="btnTriggerAlert" class="action-btn hidden" style="background:#ff9800;">+ Trigger Test Alert</button>
           </div>
           <div id="alertsList" class="data-list"></div>
         </div>
@@ -155,8 +155,30 @@
           <input type="checkbox" id="settingHighlightBorders">
           <label for="settingHighlightBorders">Highlight inner and outer borders of Uttarakhand</label>
         </div>
+        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border);">
+          <label for="settingDebugMode" style="margin-bottom: 0;">DEBUG MODE</label>
+          <label class="switch">
+            <input type="checkbox" id="settingDebugMode">
+            <span class="slider"></span>
+          </label>
+        </div>
         <button type="button" id="btnSaveSettings" class="submit-btn" style="margin-top:20px;">Save Settings</button>
       </form>
+    </div>
+  </div>
+
+  <div id="passkeyModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+      <h2>Unlock Debug Mode</h2>
+      <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">This action requires administrative privileges. Please enter the passkey to continue.</p>
+      <div class="form-group">
+        <label>Passkey</label>
+        <input type="password" id="debugPasskey" placeholder="Enter passkey">
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button type="button" id="btnVerifyPasskey" class="submit-btn">Unlock</button>
+        <button type="button" id="btnCancelPasskey" class="submit-btn" style="background: var(--hover); color: var(--text-primary); width: 100%;">Cancel</button>
+      </div>
     </div>
   </div>
 

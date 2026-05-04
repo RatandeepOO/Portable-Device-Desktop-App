@@ -226,16 +226,21 @@ app.delete('/api/devices/:id', async (req, res) => {
 
 app.get('/api/teams', async (req, res) => {
   try {
-    console.log('Fetching teams from Supabase...');
-    const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-    if (error) {
-      console.error('Supabase error (teams):', error);
-      throw error;
-    }
-    console.log(`Successfully fetched ${data?.length || 0} teams.`);
-    res.json(data);
+    const { data: teams, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+
+    // Merge with Redis status for online info
+    const enrichedTeams = await Promise.all(teams.map(async (team) => {
+      const statusData = await redis.get(`team:${team.id}:status`);
+      const status = statusData ? JSON.parse(statusData) : { online: false };
+      return { 
+        ...team, 
+        is_online: status.online !== false 
+      };
+    }));
+
+    res.json(enrichedTeams);
   } catch (error) {
-    console.error('API error (teams):', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -554,8 +559,14 @@ wss.on('connection', (ws) => {
 
         await redis.set(`team:${teamId}:status`, JSON.stringify({
           available: true,
-          currentAlertId: null
+          currentAlertId: null,
+          online: true
         }));
+
+        broadcastToAll({
+          type: 'team:online',
+          data: { teamId }
+        });
 
         ws.send(JSON.stringify({ type: 'connected', teamId }));
       }
