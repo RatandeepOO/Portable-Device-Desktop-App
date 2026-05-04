@@ -103,6 +103,50 @@ app.get('/api/test', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Mock alert endpoint for testing the full dispatch pipeline
+app.post('/api/test/mock-alert', async (req, res) => {
+  try {
+    // Allow override via body, or use defaults
+    const { device_id, lat, lng, click_count } = req.body;
+
+    // If no device_id given, pick the first registered device
+    let targetDeviceId = device_id;
+    if (!targetDeviceId) {
+      const { data: firstDevice } = await supabase.from('devices').select('device_id').limit(1).single();
+      if (!firstDevice) {
+        return res.status(400).json({ error: 'No devices registered. Register a device first.' });
+      }
+      targetDeviceId = firstDevice.device_id;
+    }
+
+    const alertLat = lat || 29.2194 + (Math.random() * 0.05 - 0.025);
+    const alertLng = lng || 78.9527 + (Math.random() * 0.05 - 0.025);
+    const alertStatus = click_count || Math.floor(Math.random() * 3) + 1; // 1-3
+
+    console.log(`\n=== MOCK ALERT TRIGGERED ===`);
+    console.log(`Device: ${targetDeviceId}`);
+    console.log(`Location: ${alertLat.toFixed(6)}, ${alertLng.toFixed(6)}`);
+    console.log(`Status/Clicks: ${alertStatus}`);
+    console.log(`===========================\n`);
+
+    await handleNewAlert(targetDeviceId, alertLat, alertLng, alertStatus);
+
+    res.json({
+      success: true,
+      message: 'Mock alert triggered',
+      details: {
+        device_id: targetDeviceId,
+        lat: alertLat,
+        lng: alertLng,
+        click_count: alertStatus
+      }
+    });
+  } catch (error) {
+    console.error('Mock alert error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/devices', async (req, res) => {
   try {
     console.log('Fetching devices from Supabase...');
@@ -169,8 +213,9 @@ app.put('/api/devices/:id', async (req, res) => {
 app.delete('/api/devices/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { error } = await supabase.from('devices').delete().eq('id', id);
+    const { data, error } = await supabase.from('devices').delete().eq('id', id).select();
     if (error) throw error;
+    if (!data || data.length === 0) throw new Error("Delete failed. Device not found or RLS policy blocked the action.");
     
     broadcastToAll({ type: 'device:updated', action: 'delete', id });
     res.json({ success: true });
@@ -219,10 +264,6 @@ app.put('/api/teams/:id', async (req, res) => {
     if (teamId) updates.team_id = teamId;
     if (image_url) updates.image_url = image_url;
     if (is_available !== undefined) updates.is_available = is_available;
-    if (password) {
-      const bcrypt = require('bcryptjs');
-      updates.password_hash = await bcrypt.hash(password, 10);
-    }
 
     const { data, error } = await supabase.from('users').update(updates).eq('id', id).select().single();
     if (error) throw error;
@@ -237,8 +278,9 @@ app.put('/api/teams/:id', async (req, res) => {
 app.delete('/api/teams/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { error } = await supabase.from('users').delete().eq('id', id);
+    const { data, error } = await supabase.from('users').delete().eq('id', id).select();
     if (error) throw error;
+    if (!data || data.length === 0) throw new Error("Delete failed. Team member not found or RLS policy blocked the action.");
     
     broadcastToAll({ type: 'team:updated', action: 'delete', id });
     res.json({ success: true });
@@ -292,13 +334,51 @@ app.put('/api/alerts/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const { data, error } = await supabase.from('alerts').update(updates).eq('id', id).select().single();
+    const { data, error } = await supabase.from('alerts')
+      .update(updates)
+      .eq('id', id)
+      .select('*, devices(*), users(*)')
+      .single();
+    
     if (error) throw error;
+    
+    // If the alert was explicitly unassigned, try to find a new team
+    if (updates.is_assigned === false && !updates.team_id) {
+      console.log(`Alert ${id} was unassigned, searching for new team...`);
+      const { data: fullAlert } = await supabase.from('alerts')
+        .select('*, devices(*), users(*)')
+        .eq('id', id)
+        .single();
+      
+      if (fullAlert) {
+        findNearestTeam(fullAlert);
+      }
+    }
+
+    broadcastToAll({ 
+      type: 'alert:updated', 
+      data: data 
+    });
+    
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+app.delete('/api/alerts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase.from('alerts').delete().eq('id', id).select();
+    if (error) throw error;
+    
+    broadcastToAll({ type: 'alert:updated', action: 'delete', id });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 app.get('/api/team-locations', async (req, res) => {
   try {
@@ -386,9 +466,20 @@ async function assignAlertToTeam(alert, teamId) {
     }
   });
 
+  const { data: updatedAlert, error: fetchError } = await supabase
+    .from('alerts')
+    .select('*, devices(*), users(*)')
+    .eq('id', alert.id)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching updated alert for broadcast:', fetchError);
+    return;
+  }
+
   broadcastToAll({
     type: 'alert:updated',
-    data: { alertId: alert.id, teamId, is_assigned: true }
+    data: updatedAlert
   });
 }
 
@@ -470,7 +561,11 @@ wss.on('connection', (ws) => {
       }
 
       if (data.type === 'team:location') {
-        if (!teamId) return;
+        if (!teamId) {
+          console.log('team:location ignored - no teamId (unauthenticated client)');
+          return;
+        }
+        console.log(`team:location from ${teamId}: lat=${data.lat}, lng=${data.lng}`);
         await redis.set(`team:${teamId}:location`, JSON.stringify({
           lat: data.lat,
           lng: data.lng,
@@ -482,6 +577,11 @@ wss.on('connection', (ws) => {
           current_lng: data.lng,
           last_location_update: new Date().toISOString()
         }).eq('id', teamId);
+
+        broadcastToAll({
+          type: 'team:location',
+          data: { teamId, lat: data.lat, lng: data.lng }
+        });
       }
 
       if (data.type === 'team:status') {
@@ -493,6 +593,11 @@ wss.on('connection', (ws) => {
         await redis.set(`team:${teamId}:status`, JSON.stringify(statusData));
 
         await supabase.from('users').update({ is_available: data.available }).eq('id', teamId);
+
+        broadcastToAll({
+          type: 'team:status',
+          data: { teamId, available: data.available }
+        });
       }
 
       if (data.type === 'alert:accept') {
@@ -537,6 +642,11 @@ wss.on('connection', (ws) => {
           to_team_id: teamId
         });
 
+        const { data: updatedAlert } = await supabase.from('alerts')
+          .select('*, devices(*), users(*)')
+          .eq('id', alertId)
+          .single();
+
         await redis.set(`team:${teamId}:status`, JSON.stringify({
           available: true,
           currentAlertId: null
@@ -544,7 +654,63 @@ wss.on('connection', (ws) => {
 
         broadcastToAll({
           type: 'alert:resolved',
-          data: { alertId, teamId }
+          data: updatedAlert
+        });
+      }
+
+      if (data.type === 'alert:reassign' || data.type === 'alert:forward') {
+        if (!teamId) return;
+        const { alertId, targetTeamId } = data;
+
+        console.log(`Reassigning alert ${alertId} to team ${targetTeamId}`);
+
+        const { data: alert, error: updateError } = await supabase.from('alerts')
+          .update({
+            team_id: targetTeamId,
+            is_assigned: !!targetTeamId,
+            assigned_at: targetTeamId ? new Date().toISOString() : null
+          })
+          .eq('id', alertId)
+          .select('*, devices(*), users(*)')
+          .single();
+
+        if (updateError) {
+          console.error('Reassign error:', updateError);
+          return;
+        }
+
+        await supabase.from('alert_history').insert({
+          alert_id: alertId,
+          event_type: 'reassigned',
+          from_team_id: teamId,
+          to_team_id: targetTeamId
+        });
+
+        // Update redis statuses
+        await redis.set(`team:${teamId}:status`, JSON.stringify({
+          available: true,
+          currentAlertId: null
+        }));
+
+        if (targetTeamId) {
+          await redis.set(`team:${targetTeamId}:status`, JSON.stringify({
+            available: false,
+            currentAlertId: alertId
+          }));
+          
+          sendToTeam(targetTeamId, {
+            type: 'alert:new',
+            data: alert
+          });
+        } else {
+          // If no target team, try to find the nearest available team
+          console.log(`No target team for forward, searching nearest...`);
+          findNearestTeam(alert);
+        }
+
+        broadcastToAll({
+          type: 'alert:updated',
+          data: alert
         });
       }
 

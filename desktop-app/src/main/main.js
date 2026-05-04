@@ -17,7 +17,7 @@ let ngrokProcess = null;
 // Configuration
 const WS_PORT = process.env.WS_PORT || 8000;
 const INTERNAL_URL = `http://127.0.0.1:${WS_PORT}`;
-const NGROK_DOMAIN = "uncondoling-tenderly-wilfred.ngrok-free.dev";
+const NGROK_DOMAIN = "fractious-subimbricately-ivey.ngrok-free.dev";
 
 // Load .env manually since dotenv is not a dependency
 function loadEnv() {
@@ -170,7 +170,7 @@ function startNgrok() {
   }
 
   console.log('Starting Ngrok...');
-  const args = ['http', WS_PORT.toString(), '--domain', NGROK_DOMAIN];
+  const args = ['http', WS_PORT.toString(), '--url', `https://${NGROK_DOMAIN}`];
   
   ngrokProcess = spawn('ngrok', args, { shell: true });
 

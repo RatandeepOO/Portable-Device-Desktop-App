@@ -185,7 +185,7 @@ function createAlertMarker(alert) {
   return marker;
 }
 
-function createTeamMarker(team) {
+function createOrUpdateTeamMarker(team) {
   if (!team.current_lat || !team.current_lng) return null;
 
   const statusClass = getTeamStatusClass(team);
@@ -196,13 +196,26 @@ function createTeamMarker(team) {
     iconAnchor: [12, 12]
   });
 
+  const popupContent = `
+    <strong>${team.name}</strong><br>
+    Status: ${team.is_available ? 'Available' : 'Busy'}<br>
+    Phone: ${team.phone || 'N/A'}<br>
+    Location: ${team.current_lat.toFixed(6)}, ${team.current_lng.toFixed(6)}<br>
+    Updated: ${team.last_location_update ? new Date(team.last_location_update).toLocaleTimeString() : 'N/A'}
+  `;
+
+  // If marker already exists for this team, just update its position and popup
+  if (teamMarkers[team.id]) {
+    teamMarkers[team.id].setLatLng([team.current_lat, team.current_lng]);
+    teamMarkers[team.id].setIcon(icon);
+    teamMarkers[team.id].setPopupContent(popupContent);
+    return teamMarkers[team.id];
+  }
+
+  // Create new marker only if one doesn't exist yet
   const marker = L.marker([team.current_lat, team.current_lng], { icon })
     .addTo(map)
-    .bindPopup(`
-      <strong>${team.name}</strong><br>
-      Status: ${team.is_available ? 'Available' : 'Busy'}<br>
-      Phone: ${team.phone || 'N/A'}
-    `);
+    .bindPopup(popupContent);
 
   teamMarkers[team.id] = marker;
   return marker;
@@ -211,43 +224,48 @@ function createTeamMarker(team) {
 
 function renderAlertsList() {
   const container = document.getElementById('alertsList');
+   const validAlerts = alerts.filter(a => a && a.id);
   
-  const activeAlerts = alerts.filter(a => !a.is_resolved);
-  
-  if (activeAlerts.length === 0) {
-    container.innerHTML = '<div class="empty-state"><p>No active alerts</p></div>';
+  if (validAlerts.length === 0) {
+    container.innerHTML = '<p class="placeholder-text">No active alerts</p>';
     return;
   }
 
-  container.innerHTML = activeAlerts.map(alert => `
-    <div class="data-item ${selectedItem?.id === alert.id ? 'selected' : ''}" data-id="${alert.id}" data-type="alert">
-      <div class="data-item-header">
-        <div class="status-dot ${getStatusClass(alert.status)}"></div>
-        <div class="data-item-info">
-          <div class="data-item-title">${alert.devices?.device_id || 'Unknown'} - ${getStatusLabel(alert.status)}</div>
-          <div class="data-item-subtitle">${new Date(alert.created_at).toLocaleString()}</div>
+  container.innerHTML = validAlerts.map(alert => {
+    const deviceId = alert.devices?.device_id || alert.device_id || 'Unknown';
+    const severity = alert.severity || 'Unknown';
+    const dateStr = alert.created_at ? new Date(alert.created_at).toLocaleString() : 'Invalid Date';
+    
+    return `
+      <div class="data-item alert-item ${selectedItem?.id === alert.id ? 'selected' : ''}" onclick="selectAlert('${alert.id}')">
+        <div class="status-dot ${alert.is_assigned ? 'online' : 'busy'}"></div>
+        <div class="data-item-content">
+          <div class="data-item-title">${deviceId} - ${severity}</div>
+          <div class="data-item-subtitle">${dateStr}</div>
+        </div>
+        <div class="data-item-actions">
+          ${alert.is_assigned ? '<span class="detail-value" style="color:#4CAF50;">Assigned</span>' : '<span class="detail-value" style="color:#ff9800;">Pending</span>'}
+          <button class="item-btn danger" onclick="event.stopPropagation(); deleteAlert('${alert.id}')">Delete</button>
         </div>
       </div>
-      <div class="data-item-actions">
-        ${alert.is_assigned ? '<span class="detail-value">Assigned</span>' : '<span class="detail-value">Pending</span>'}
-      </div>
-    </div>
-  `).join('');
-
-  container.querySelectorAll('.data-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const id = item.dataset.id;
-      const alert = alerts.find(a => a.id === id);
-      if (alert) {
-        selectItem(alert, 'alert');
-        map.setView([alert.alert_lat, alert.alert_lng], 12);
-        if (markers[alert.id]) {
-          markers[alert.id].openPopup();
-        }
-      }
-    });
-  });
+    `;
+  }).join('');
 }
+
+window.selectAlert = function(id) {
+  const alert = alerts.find(a => a.id === id);
+  if (alert) {
+    selectedItem = alert;
+    renderAlertsList();
+    showAlertDetails(alert);
+    if (alert.alert_lat && alert.alert_lng) {
+      map.setView([alert.alert_lat, alert.alert_lng], 12);
+      if (markers[alert.id]) {
+        markers[alert.id].openPopup();
+      }
+    }
+  }
+};
 
 function renderDevicesList() {
   const container = document.getElementById('devicesList');
@@ -347,6 +365,9 @@ function selectItem(item, type) {
 function showTeamDetails(team) {
   const container = document.getElementById('teamDetails');
   container.innerHTML = `
+    <div class="detail-header">
+      <h4>Team Information</h4>
+    </div>
     <div class="detail-item">
       <span class="detail-label">Team Leader Name</span>
       <span class="detail-value">${team.name}</span>
@@ -369,7 +390,50 @@ function showTeamDetails(team) {
     </div>
     <div class="detail-item">
       <span class="detail-label">Current Location</span>
-      <span class="detail-value">${team.current_lat && team.current_lng ? `${team.current_lat}, ${team.current_lng}` : 'N/A'}</span>
+      <span class="detail-value">${team.current_lat && team.current_lng ? `${team.current_lat.toFixed(6)}, ${team.current_lng.toFixed(6)}` : 'N/A'}</span>
+    </div>
+  `;
+}
+
+function showAlertDetails(alert) {
+  const container = document.getElementById('teamDetails');
+  const assignedTeam = alert.users; // From Supabase join
+  
+  container.innerHTML = `
+    <div class="detail-header">
+      <h4>Alert Details</h4>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Device ID</span>
+      <span class="detail-value">${alert.devices?.device_id || 'Unknown'}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">User Name</span>
+      <span class="detail-value">${alert.devices?.user_name || 'Unknown'}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Severity</span>
+      <span class="detail-value ${getStatusClass(alert.status)}">${getStatusLabel(alert.status)}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Location</span>
+      <span class="detail-value">${alert.alert_lat.toFixed(6)}, ${alert.alert_lng.toFixed(6)}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Assigned Team</span>
+      <span class="detail-value" style="color: ${alert.is_assigned && assignedTeam ? '#4CAF50' : '#ff9800'}; font-weight: bold;">
+        ${alert.is_assigned && assignedTeam ? `${assignedTeam.name} (${assignedTeam.team_id})` : 'PENDING DISPATCH'}
+      </span>
+    </div>
+    ${alert.is_assigned && assignedTeam ? `
+    <div class="detail-item">
+      <span class="detail-label">Team Contact</span>
+      <span class="detail-value">${assignedTeam.phone || 'N/A'}</span>
+    </div>
+    ` : ''}
+    <div class="detail-item">
+      <span class="detail-label">Time Triggered</span>
+      <span class="detail-value">${new Date(alert.created_at).toLocaleString()}</span>
     </div>
   `;
 }
@@ -382,9 +446,9 @@ async function loadData() {
       window.electronAPI.apiRequest({ method: 'GET', url: '/api/teams' })
     ]);
     
-    alerts = alertsRes || [];
-    devices = devicesRes || [];
-    teams = teamsRes || [];
+    alerts = (alertsRes.data || alertsRes || []).filter(a => a && a.id);
+    devices = devicesRes.data || devicesRes || [];
+    teams = teamsRes.data || teamsRes || [];
     
     renderAlertsList();
     renderDevicesList();
@@ -396,13 +460,24 @@ async function loadData() {
 }
 
 function updateMapMarkers() {
+  // Clear and recreate alert markers (these change less frequently)
   Object.values(markers).forEach(m => m.remove());
-  Object.values(teamMarkers).forEach(m => m.remove());
   markers = {};
-  teamMarkers = {};
-
   alerts.filter(a => !a.is_resolved).forEach(createAlertMarker);
-  teams.forEach(t => createTeamMarker(t));
+
+  // For team markers: update in-place or create new, then remove stale ones
+  const currentTeamIds = new Set();
+  teams.forEach(t => {
+    createOrUpdateTeamMarker(t);
+    currentTeamIds.add(t.id);
+  });
+  // Remove markers for teams that no longer exist
+  Object.keys(teamMarkers).forEach(id => {
+    if (!currentTeamIds.has(id)) {
+      teamMarkers[id].remove();
+      delete teamMarkers[id];
+    }
+  });
 }
 
 function setupEventListeners() {
@@ -427,6 +502,9 @@ function setupEventListeners() {
   document.getElementById('btnAddTeam').addEventListener('click', () => {
     document.getElementById('teamForm').reset();
     document.getElementById('teamForm').dataset.editId = '';
+    const passkeyInput = document.getElementById('teamPasskey');
+    passkeyInput.disabled = false;
+    passkeyInput.placeholder = '';
     document.getElementById('teamSubmitBtn').textContent = 'Add Team Member';
     document.getElementById('teamModal').classList.add('show');
   });
@@ -437,6 +515,18 @@ function setupEventListeners() {
     document.getElementById('settingHighlightBorders').checked = localStorage.getItem('highlightBorders') === 'true';
     document.getElementById('settingsModal').classList.add('show');
   });
+
+  const btnTriggerAlert = document.getElementById('btnTriggerAlert');
+  if (btnTriggerAlert) {
+    btnTriggerAlert.addEventListener('click', async () => {
+      try {
+        await window.electronAPI.apiRequest({ method: 'POST', url: '/api/test/mock-alert', data: {} });
+        console.log('Mock alert triggered');
+      } catch (error) {
+        console.error('Failed to trigger mock alert:', error);
+      }
+    });
+  }
 
   document.getElementById('btnSaveSettings').addEventListener('click', () => {
     const theme = document.getElementById('settingTheme').value;
@@ -500,15 +590,23 @@ function setupEventListeners() {
 
   document.getElementById('teamForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const isUpdate = document.getElementById('teamSubmitBtn').textContent === 'Update Team Member';
+    const password = document.getElementById('teamPasskey').value;
+    
+    if (!isUpdate && !password) {
+      alert('Passkey is required for new team members.');
+      return;
+    }
+
     const data = {
       teamId: document.getElementById('teamId').value,
-      password: document.getElementById('teamPasskey').value,
+      password: password,
       name: document.getElementById('teamLeaderName').value,
       phone: document.getElementById('teamMembersCount').value.toString()
     };
     
     try {
-      if (document.getElementById('teamSubmitBtn').textContent === 'Update Team Member') {
+      if (isUpdate) {
         const selectedId = document.getElementById('teamForm').dataset.editId;
         if (selectedId) await window.electronAPI.apiRequest({ method: 'PUT', url: `/api/teams/${selectedId}`, data });
       } else {
@@ -596,9 +694,63 @@ function setupEventListeners() {
   window.electronAPI.onWsMessage((data) => {
     console.log('WebSocket message:', data);
     
+    // Handle team:location updates in-place
+    if (data.type === 'team:location' && data.data) {
+      const { teamId, lat, lng } = data.data;
+      const team = teams.find(t => t.id === teamId);
+      if (team) {
+        team.current_lat = lat;
+        team.current_lng = lng;
+        team.last_location_update = new Date().toISOString();
+        createOrUpdateTeamMarker(team);
+      }
+      return;
+    }
+
+    // Handle alert updates in-place for "very fast" sync
+    if ((data.type === 'alert:updated' || data.type === 'alert:accepted' || data.type === 'alert:resolved') && data.data?.id) {
+      const updatedAlert = data.data;
+      const index = alerts.findIndex(a => a.id === updatedAlert.id);
+      
+      if (data.type === 'alert:resolved') {
+        // Remove resolved alerts from active list
+        if (index !== -1) {
+          alerts.splice(index, 1);
+          if (selectedItem?.id === updatedAlert.id) {
+            selectedItem = null;
+            document.getElementById('teamDetails').innerHTML = '<p class="placeholder-text">Select a team or alert to view details</p>';
+          }
+        }
+      } else {
+        if (index !== -1) {
+          alerts[index] = updatedAlert;
+        } else {
+          alerts.unshift(updatedAlert);
+        }
+        
+        if (selectedItem?.id === updatedAlert.id) {
+          selectedItem = updatedAlert;
+          showAlertDetails(updatedAlert);
+        }
+      }
+      
+      renderAlertsList();
+      updateMapMarkers();
+      return;
+    }
+
+    if (data.type === 'alert:new' && data.data?.id) {
+      const newAlert = data.data;
+      if (!alerts.some(a => a.id === newAlert.id)) {
+        alerts.unshift(newAlert);
+        renderAlertsList();
+        updateMapMarkers();
+      }
+      return;
+    }
+    
     const reloadTypes = [
-      'alert:new', 'alert:updated', 'alert:accepted', 'alert:resolved',
-      'device:updated', 'team:updated', 'team:offline', 'team:location'
+      'device:updated', 'team:updated', 'team:offline', 'team:status'
     ];
     
     if (reloadTypes.includes(data.type)) {
@@ -670,7 +822,12 @@ window.editTeam = async function(id) {
   
   document.getElementById('teamForm').dataset.editId = team.id;
   document.getElementById('teamId').value = team.team_id;
-  document.getElementById('teamPasskey').value = '';
+  
+  const passkeyInput = document.getElementById('teamPasskey');
+  passkeyInput.value = '';
+  passkeyInput.disabled = true;
+  passkeyInput.placeholder = 'Passkey cannot be changed';
+  
   document.getElementById('teamLeaderName').value = team.name;
   document.getElementById('teamMembersCount').value = team.phone || '';
   
@@ -686,6 +843,26 @@ window.deleteTeam = async function(id) {
     loadData();
   } catch (error) {
     alert('Error deleting team member: ' + error.message);
+  }
+};
+
+window.deleteAlert = async function deleteAlert(alertId) {
+  if (!alertId || alertId === 'undefined') {
+    console.error('Cannot delete alert with invalid ID');
+    return;
+  }
+  
+  if (!confirm('Are you sure you want to delete this alert?')) return;
+  
+  try {
+    await window.electronAPI.apiRequest({ method: 'DELETE', url: `/api/alerts/${alertId}` });
+    if (selectedItem?.id === alertId) {
+      selectedItem = null;
+      document.getElementById('teamDetails').innerHTML = '<p class="placeholder-text">Select a team or alert to view details</p>';
+    }
+    loadData();
+  } catch (error) {
+    alert('Error deleting alert: ' + error.message);
   }
 };
 
@@ -711,5 +888,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Fallback: load after some time to ensure server is ready if signal missed
   setTimeout(loadData, 3000);
   
-  setInterval(loadData, 10000);
+  setInterval(loadData, 60000); // Polling reduced to 60s as WebSockets provide real-time updates
 });

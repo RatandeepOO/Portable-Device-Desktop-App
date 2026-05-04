@@ -9,7 +9,7 @@ from pathlib import Path
 # Configuration
 PROJECT_ROOT = Path(__file__).parent.absolute()
 ENV_FILE = PROJECT_ROOT / ".env"
-NGROK_DOMAIN = "uncondoling-tenderly-wilfred.ngrok-free.dev"
+NGROK_DOMAIN = "fractious-subimbricately-ivey.ngrok-free.dev"
 
 def update_env(key, value):
     if not ENV_FILE.exists():

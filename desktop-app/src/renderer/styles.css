@@ -209,6 +209,30 @@ body {
   color: var(--text-primary);
 }
 
+.detail-header {
+  margin-top: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-header h4 {
+  font-size: 15px;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-online {
+  color: #00CC66;
+  font-weight: 600;
+}
+
+.status-busy {
+  color: #CC6600;
+  font-weight: 600;
+}
+
 .bottom-panel {
   height: 280px;
   border-top: 1px solid var(--border);
