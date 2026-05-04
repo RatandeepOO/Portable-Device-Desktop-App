@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.responseteam"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,6 +24,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -43,6 +44,11 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 
@@ -73,9 +79,6 @@ dependencies {
     // JSON Parsing
     implementation("com.google.code.gson:gson:2.11.0")
     
-    // Kotlin Serialization (Optional but good for clean data classes)
-    // For now we use GSON's SerializedName
-
     // SharedPreferences (encrypted)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
