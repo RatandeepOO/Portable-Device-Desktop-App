@@ -2,18 +2,32 @@ import { motion } from 'framer-motion'
 
 export const ExplodedViewSection = () => {
   return (
-    <section className="h-screen w-screen relative overflow-hidden flex items-center justify-center">
-      <div className="absolute inset-0 flex items-center justify-center">
+    <section className="min-h-screen w-full relative overflow-hidden flex flex-col items-center justify-center py-40">
+      <div className="absolute inset-0 flex items-center justify-center opacity-10">
          <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             whileInView={{ opacity: 1, scale: 1 }}
             className="text-center"
          >
-            <h2 className="text-8xl font-black text-white/5 select-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                INTERNAL ARCHITECTURE
+            <h2 className="text-[20vw] font-black text-white select-none">
+                FORM
             </h2>
          </motion.div>
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1 }}
+        className="relative z-10 mb-20"
+      >
+        <img 
+          src="/assets/product/PRODUCT_TOP.png" 
+          alt="SOS DOCK Top View" 
+          className="w-full max-w-4xl mx-auto drop-shadow-[0_0_80px_rgba(255,107,0,0.15)]"
+        />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-brand-orange/5 blur-[100px] -z-10" />
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-6xl w-full px-6 z-10">
         <motion.div
@@ -33,7 +47,7 @@ export const ExplodedViewSection = () => {
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass p-10 rounded-[40px] border-brand-orange/20 self-end"
+          className="glass p-10 rounded-[40px] border-brand-orange/20"
         >
           <div className="text-brand-orange text-sm font-bold tracking-[0.2em] mb-4">TRANSMITTER</div>
           <h3 className="text-4xl font-bold mb-6">NRF24L01+ Integration</h3>
