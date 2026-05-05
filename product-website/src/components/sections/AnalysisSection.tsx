@@ -8,27 +8,27 @@ export const AnalysisSection = () => {
   const views = [
     {
       id: "front",
-      title: "Front View",
-      axis: "Primary Interface",
-      desc: "Clean white tactical housing with the centralized SMA antenna connector and precision-milled structural frame.",
+      title: "Front Interface",
+      axis: "Body & Comms",
+      desc: "Reinforced white tactical housing integrated with the NRF24L01+ communication module for high-reliability telemetry.",
       img: "/assets/product/PRODUCT_FRONT.png",
-      specs: ["High-Gain Antenna Mount", "White Tactile Finish", "Reinforced Front Panel"]
+      specs: ["High-Impact Body", "NRF24L01+ Integrated", "Precision RF Window"]
     },
     {
       id: "side2",
-      title: "Tactical Control",
-      axis: "Action Center",
-      desc: "Side-mounted interactive cluster featuring the signature blue SOS trigger button and power management toggle.",
+      title: "Control Profile",
+      axis: "Power & Charge",
+      desc: "Side-access interface featuring the tactile power toggle and the weather-sealed high-speed charging port.",
       img: "/assets/product/PRODUCT_SIDE2.png",
-      specs: ["Tactile SOS Button", "Power Control Switch", "Precision Grip Texture"]
+      specs: ["Tactile Power Button", "USB-C Charging Port", "Weather-Sealed Gasket"]
     },
     {
       id: "top",
-      title: "Technical Top View",
-      axis: "Aerial Layout",
-      desc: "Top-down perspective showcasing the RF distribution layout and the secure chassis integration points.",
+      title: "Top Deployment",
+      axis: "SOS Interface",
+      desc: "Top-down view focusing exclusively on the oversized emergency SOS alert button for zero-latency activation.",
       img: "/assets/product/PRODUCT_TOP.png",
-      specs: ["RF Output Port", "Chassis Assembly Screws", "Aero-Grade Structural Lid"]
+      specs: ["Oversized SOS Button", "Direct Trigger Path", "Tactile Feedback Hub"]
     },
     {
       id: "iso",

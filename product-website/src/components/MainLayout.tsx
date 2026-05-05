@@ -5,6 +5,7 @@ import { WorkflowSection } from './sections/WorkflowSection'
 import { AnimationsSection } from './sections/AnimationsSection'
 import { SchematicSection } from './sections/SchematicSection'
 import { AnalysisSection } from './sections/AnalysisSection'
+import { EvolutionSection } from './sections/EvolutionSection'
 import { TeamSection } from './sections/TeamSection'
 
 export const MainLayout = () => {
@@ -15,6 +16,7 @@ export const MainLayout = () => {
       <ExplodedViewSection />
       <AnalysisSection />
       <AnimationsSection />
+      <EvolutionSection />
       <SchematicSection />
       <WorkflowSection />
       <TeamSection />

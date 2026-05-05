@@ -3,16 +3,16 @@ import { Github, Linkedin } from 'lucide-react'
 
 export const TeamSection = () => {
   const team = [
-    { name: "Pinky", role: "System Architect & Lead", id: "23009122007", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Saloni Das", role: "Desktop Frontend Architect", id: "23009120025", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Jyoti Rani", role: "Mobile Systems Engineer", id: "230091220011", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Ratandeep Arora", role: "Backend & Real-time Engineer", id: "24009052002", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Payal Negi", role: "Embedded & Toolchain Specialist", id: "23009120028", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Vinita", role: "DevOps & Release Architect", id: "23009120019", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Kavita", role: "Quality & Reliability Engineer", id: "23009250024", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Akansha Sharma", role: "UX/UI Design Engineer", id: "23009050005", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Ashish Kumar", role: "IOT System Developer", id: "24009092004", img: "/team_placeholder_portrait_1777601970415.png" },
-    { name: "Parul", role: "Embedded & Wireless Communication", id: "", img: "/team_placeholder_portrait_1777601970415.png" }
+    { name: "Pinky", role: "System Architect & Lead", id: "23009122007", img: "/assets/team/pinky.png" },
+    { name: "Saloni Das", role: "Desktop Frontend Architect", id: "23009120025", img: "/assets/team/saloni.jpeg" },
+    { name: "Jyoti Rani", role: "Mobile Systems Engineer", id: "230091220011", img: "/assets/team/jyoti.jpeg" },
+    { name: "Ratandeep Arora", role: "Backend & Real-time Engineer", id: "24009052002", img: "/assets/team/ratan.jpg" },
+    { name: "Payal Negi", role: "Embedded & Toolchain Specialist", id: "23009120028", img: "/assets/team/payal.jpeg" },
+    { name: "Vinita", role: "DevOps & Release Architect", id: "23009120019", img: "/assets/team/viniti.jpeg" },
+    { name: "Kavita", role: "Quality & Reliability Engineer", id: "23009250024", img: "/assets/team/kavita.png" },
+    { name: "Akansha Sharma", role: "UX/UI Design Engineer", id: "23009050005", img: "/assets/team/akansha.jpeg" },
+    { name: "Ashish Kumar", role: "IOT System Developer", id: "24009092004", img: "/assets/team/ashish.png" },
+    { name: "Parul", role: "Embedded & Wireless Communication", id: "", img: "/assets/team/parul.jpeg" }
   ]
 
   return (
