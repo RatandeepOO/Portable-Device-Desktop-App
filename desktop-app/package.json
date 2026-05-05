@@ -6,8 +6,9 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "build": "electron-builder",
-    "build:exe": "electron-builder --win"
+    "build": "npm run bundle:server && electron-builder",
+    "build:exe": "npm run bundle:server && electron-builder --win",
+    "bundle:server": "npx @vercel/ncc build src/server/index.js -o src/server/dist"
   },
   "keywords": [
     "emergency",
@@ -33,7 +34,8 @@
   },
   "devDependencies": {
     "electron": "^41.2.1",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "@vercel/ncc": "^0.38.4"
   },
   "build": {
     "appId": "com.emergency.response",
@@ -50,14 +52,6 @@
     },
     "npmRebuild": false,
     "extraResources": [
-      {
-        "from": "../server",
-        "to": "server",
-        "filter": [
-          "src/**/*",
-          "package.json"
-        ]
-      },
       {
         "from": "../.env",
         "to": ".env"

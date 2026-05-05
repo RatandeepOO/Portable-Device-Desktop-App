@@ -195,12 +195,10 @@ function createAlertMarker(alert) {
   markers[alert.id] = marker;
   return marker;
 }
-
 function createOrUpdateTeamMarker(team) {
-  if (!team.current_lat || !team.current_lng) return null;
+  if (!team || !team.id || !team.current_lat || !team.current_lng) return null;
 
   // Only show markers for online teams, or if they are NOT a Mobile User
-  // (Assuming Mobile Users should only be visible when active/connected)
   if (!team.is_online && team.name === 'Mobile User') {
     if (teamMarkers[team.id]) {
       teamMarkers[team.id].remove();
@@ -210,6 +208,42 @@ function createOrUpdateTeamMarker(team) {
   }
 
   const statusClass = getTeamStatusClass(team);
+  
+  // If marker already exists, check if we only need to update position
+  if (teamMarkers[team.id]) {
+    const marker = teamMarkers[team.id];
+    marker.setLatLng([team.current_lat, team.current_lng]);
+    
+    // Only update icon and popup if status or content changed (optimized)
+    const oldStatus = marker.options.icon.options.className.split(' ').pop();
+    if (oldStatus !== statusClass) {
+      const icon = L.divIcon({
+        className: `team-marker ${statusClass}`,
+        html: `<div class="status-dot ${statusClass}"></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+      marker.setIcon(icon);
+    }
+
+    const popupContent = `
+      <strong>${team.name}</strong><br>
+      Status: ${team.is_available ? 'Available' : 'Busy'}<br>
+      Phone: ${team.phone || 'N/A'}<br>
+      Location: ${team.current_lat.toFixed(6)}, ${team.current_lng.toFixed(6)}<br>
+      Updated: ${team.last_location_update ? new Date(team.last_location_update).toLocaleTimeString() : 'N/A'}
+    `;
+    
+    // Only update popup if it's open (to save some minor cycles)
+    if (marker.isPopupOpen()) {
+      marker.setPopupContent(popupContent);
+    } else {
+      marker._popupContent = popupContent; // Cache it
+    }
+    
+    return marker;
+  }
+
   const icon = L.divIcon({
     className: `team-marker ${statusClass}`,
     html: `<div class="status-dot ${statusClass}"></div>`,
@@ -217,6 +251,7 @@ function createOrUpdateTeamMarker(team) {
     iconAnchor: [12, 12]
   });
 
+  // Create new marker
   const popupContent = `
     <strong>${team.name}</strong><br>
     Status: ${team.is_available ? 'Available' : 'Busy'}<br>
@@ -224,14 +259,6 @@ function createOrUpdateTeamMarker(team) {
     Location: ${team.current_lat.toFixed(6)}, ${team.current_lng.toFixed(6)}<br>
     Updated: ${team.last_location_update ? new Date(team.last_location_update).toLocaleTimeString() : 'N/A'}
   `;
-
-  // If marker already exists for this team, just update its position and popup
-  if (teamMarkers[team.id]) {
-    teamMarkers[team.id].setLatLng([team.current_lat, team.current_lng]);
-    teamMarkers[team.id].setIcon(icon);
-    teamMarkers[team.id].setPopupContent(popupContent);
-    return teamMarkers[team.id];
-  }
 
   // Create new marker only if one doesn't exist yet
   const marker = L.marker([team.current_lat, team.current_lng], { icon })
@@ -758,7 +785,7 @@ function setupEventListeners() {
   });
 
   window.electronAPI.onWsMessage((data) => {
-    console.log('WebSocket message:', data);
+    // console.log('WebSocket message:', data);
     
     // Handle team:location updates in-place
     if (data.type === 'team:location' && data.data) {
@@ -769,6 +796,44 @@ function setupEventListeners() {
         team.current_lng = lng;
         team.last_location_update = new Date().toISOString();
         createOrUpdateTeamMarker(team);
+        
+        // Update details if this team is selected
+        if (selectedItem?.id === teamId) {
+          showTeamDetails(team);
+        }
+      }
+      return;
+    }
+
+    // Handle team status updates in-place
+    if (data.type === 'team:status' && data.data) {
+      const { teamId, available } = data.data;
+      const team = teams.find(t => t.id === teamId);
+      if (team) {
+        team.is_available = available;
+        renderTeamsList();
+        createOrUpdateTeamMarker(team);
+        if (selectedItem?.id === teamId) {
+          showTeamDetails(team);
+        }
+      }
+      return;
+    }
+
+    // Handle team online/offline updates in-place
+    if ((data.type === 'team:online' || data.type === 'team:offline') && data.data) {
+      const { teamId } = data.data;
+      const team = teams.find(t => t.id === teamId);
+      if (team) {
+        team.is_online = (data.type === 'team:online');
+        renderTeamsList();
+        createOrUpdateTeamMarker(team);
+        if (selectedItem?.id === teamId) {
+          showTeamDetails(team);
+        }
+      } else if (data.type === 'team:online') {
+        // If it's a new team we don't know about, then reload
+        loadData();
       }
       return;
     }
@@ -816,7 +881,7 @@ function setupEventListeners() {
     }
     
     const reloadTypes = [
-      'device:updated', 'team:updated', 'team:offline', 'team:online', 'team:status'
+      'device:updated', 'team:updated'
     ];
     
     if (reloadTypes.includes(data.type)) {
@@ -839,18 +904,47 @@ function setupEventListeners() {
   });
 
   if (window.electronAPI.onServerLog) {
+    let logBuffer = [];
     window.electronAPI.onServerLog((logData) => {
+      // Append to buffer instead of immediate DOM manipulation
+      logBuffer.push(logData);
+      
+      // Limit DOM updates to every 500ms or so if buffer is large
+      if (logBuffer.length > 20) {
+        processLogBuffer();
+      }
+    });
+
+    function processLogBuffer() {
       const logsContainer = document.getElementById('serverLogsContent');
-      const lines = logData.split('\n');
+      if (!logsContainer) return;
+
+      const fullText = logBuffer.join('\n');
+      logBuffer = [];
+
+      const lines = fullText.split('\n');
+      const fragment = document.createDocumentFragment();
+      
       lines.forEach(line => {
         if (!line.trim()) return;
         const p = document.createElement('div');
         p.textContent = line;
-        logsContainer.appendChild(p);
+        fragment.appendChild(p);
       });
+
+      logsContainer.appendChild(fragment);
+      
+      // Keep logs manageable
+      while (logsContainer.children.length > 500) {
+        logsContainer.removeChild(logsContainer.firstChild);
+      }
+
       const tab = document.getElementById('logsTab');
       if (tab) tab.scrollTop = tab.scrollHeight;
-    });
+    }
+
+    // Also process periodically
+    setInterval(processLogBuffer, 1000);
   }
 }
 

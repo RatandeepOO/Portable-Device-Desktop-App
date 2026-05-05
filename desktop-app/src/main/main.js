@@ -228,9 +228,7 @@ function startServer() {
   console.log('Starting backend server...');
   
   const isPackaged = app.isPackaged;
-  const serverPath = isPackaged 
-    ? path.join(process.resourcesPath, 'server/src/index.js')
-    : path.join(__dirname, '../../../server/src/index.js');
+  const serverPath = path.join(__dirname, '../server/dist/index.js');
 
   serverProcess = fork(serverPath, [], {
     env: { ...process.env },
