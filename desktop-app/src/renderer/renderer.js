@@ -724,6 +724,12 @@ function setupEventListeners() {
   });
 
   document.getElementById('btnStart').addEventListener('click', async () => {
+    const port = document.getElementById('portSelect').value;
+    if (!port) {
+      alert('Please select a serial port (e.g., COM3) from the dropdown before starting.');
+      return;
+    }
+
     try {
       isStreaming = true;
       await window.electronAPI.startStreaming();
@@ -741,7 +747,24 @@ function setupEventListeners() {
       console.log('Streaming started');
     } catch (error) {
       console.error('Failed to start streaming:', error);
+      isStreaming = false;
     }
+  });
+
+  window.electronAPI.onSerialError((error) => {
+    alert('Serial Port Error: ' + error);
+    isStreaming = false;
+    
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    btnStart.classList.remove('active');
+    btnStop.classList.add('active');
+    
+    const statusEl = document.getElementById('connectionStatus');
+    statusEl.className = 'status-indicator offline';
+    statusEl.textContent = 'Error';
+    
+    console.error('Serial error received:', error);
   });
 
   document.getElementById('btnStop').addEventListener('click', async () => {
@@ -1036,6 +1059,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Start the live clock
   setInterval(updateClock, 1000);
+  
+  // Auto-scan for ports every 5 seconds for better UX on new machines
+  setInterval(async () => {
+    if (!isStreaming) {
+      await window.electronAPI.scanSerialPorts();
+    }
+  }, 5000);
   
   // Wait for server to be ready signal from main process
   if (window.electronAPI.onServerReady) {

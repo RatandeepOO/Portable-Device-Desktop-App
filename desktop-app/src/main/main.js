@@ -279,15 +279,36 @@ async function scanSerialPorts() {
 
 function connectSerial(portPath) {
   if (serialPort) {
-    serialPort.close();
+    try {
+      serialPort.close();
+    } catch (e) {
+      console.error('Error closing port:', e);
+    }
   }
 
-  serialPort = new SerialPort({ path: portPath, baudRate: 9600 });
+  if (!portPath) return;
+
+  console.log(`Connecting to port: ${portPath}`);
+  serialPort = new SerialPort({ 
+    path: portPath, 
+    baudRate: 9600,
+    autoOpen: false 
+  });
+
+  serialPort.open((err) => {
+    if (err) {
+      console.error('Error opening serial port:', err.message);
+      mainWindow?.webContents.send('serial:error', err.message);
+      return;
+    }
+    console.log('Serial port opened successfully');
+    mainWindow?.webContents.send('server:log', `Connected to port ${portPath}\n`);
+  });
 
   const parser = serialPort.pipe(new ReadlineParser({ delimiter: '\n' }));
 
   parser.on('data', (data) => {
-    if (!isStreaming) return; // Only process data if streaming is enabled
+    if (!isStreaming) return; 
     
     const line = data.trim();
     if (line) {
@@ -306,6 +327,7 @@ function connectSerial(portPath) {
   });
 
   serialPort.on('close', () => {
+    console.log('Serial port closed');
     mainWindow?.webContents.send('serial:closed');
   });
 }
